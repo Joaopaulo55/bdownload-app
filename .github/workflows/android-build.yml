@@ -1,0 +1,37 @@
+name: Build Cordova Android APK
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Instalar Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 11
+
+      - name: Instalar Android SDK e Cordova
+        run: |
+          sudo apt update
+          sudo apt install -y nodejs npm zip openjdk-11-jdk
+          npm install -g cordova
+          cordova platform add android
+
+      - name: Construir APK
+        run: |
+          cordova build android --release
+
+      - name: Publicar APK como artefato
+        uses: actions/upload-artifact@v3
+        with:
+          name: Bdownload-APK
+          path: platforms/android/app/build/outputs/apk/release/*.apk

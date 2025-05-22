@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BDownload</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><i class="fas fa-download"></i> BDownload</h1>
+      <p>Baixe vídeos e áudios de várias plataformas</p>
+      <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema">
+        <i class="fas fa-moon"></i>
+      </button>
+    </header>
+
+    <main>
+      <div class="download-card">
+        <div class="input-group">
+          <input id="url" type="text" placeholder="Cole o link do vídeo aqui..." aria-label="URL do vídeo">
+          <button id="check"><i class="fas fa-search"></i> <span class="btn-text">Ver Qualidades</span></button>
+        </div>
+        
+        <div class="platform-icons">
+          <i class="fab fa-youtube" title="YouTube"></i>
+          <i class="fab fa-vimeo-v" title="Vimeo"></i>
+          <i class="fab fa-facebook" title="Facebook"></i>
+          <i class="fab fa-instagram" title="Instagram"></i>
+          <i class="fab fa-tiktok" title="TikTok"></i>
+          <i class="fas fa-globe" title="Outros sites"></i>
+        </div>
+      </div>
+
+      <div class="result-container hidden" id="resultContainer">
+        <div class="media-info">
+          <img id="thumb" class="hidden" alt="Miniatura do vídeo" loading="lazy">
+          <div class="media-details">
+            <h3 id="mediaTitle">Título do vídeo</h3>
+            <p id="mediaDuration">Duração: --:--</p>
+          </div>
+        </div>
+
+        <div class="download-options">
+          <h4>Formatos disponíveis:</h4>
+          <select id="formats" size="6" class="hidden" aria-label="Formatos disponíveis"></select>
+          
+          <div class="progress-container hidden" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+            <span class="progress-text" id="progressText">0%</span>
+          </div>
+          
+          <button id="download" class="hidden"><i class="fas fa-download"></i> <span class="btn-text">Baixar Selecionado</span></button>
+        </div>
+      </div>
+
+      <p id="status" class="status-message" aria-live="polite"></p>
+    </main>
+
+    <footer>
+      <p>BDownload &copy; 2025 <span id="currentYear"></span> - Todos os direitos reservados</p>
+      <p class="disclaimer">Este serviço é apenas para fins educacionais</p>
+    </footer>
+  </div>
+
+  <script>
+    // Atualiza o ano no footer
+    document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+    const el = id => document.getElementById(id);
+
+    // Toggle dark/light theme
+    el('themeToggle').onclick = () => {
+      document.body.classList.toggle('dark-theme');
+      const icon = el('themeToggle').querySelector('i');
+      if (document.body.classList.contains('dark-theme')) {
+        icon.classList.replace('fa-moon', 'fa-sun');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        icon.classList.replace('fa-sun', 'fa-moon');
+        localStorage.setItem('theme', 'light');
+      }
+    };
+
+    // Verifica o tema salvo
+    if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.add('dark-theme');
+      el('themeToggle').querySelector('i').classList.replace('fa-moon', 'fa-sun');
+    }
+
+    el('check').onclick = async () => {
+      const url = el('url').value.trim();
+      if(!url) {
+        showStatus('Por favor, insira um URL válido', 'error');
+        return;
+      }
+      
+      showStatus('Consultando...');
+      el('check').disabled = true;
+
+      try {
+        const res = await fetch('/formats', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({url})
+        });
+        const data = await res.json();
+        
+        if(data.error){
+          showStatus(data.error, 'error');
+          return;
+        }
+
+        // Preenche os dados
+        el('thumb').src = data.thumbnail;
+        el('thumb').classList.remove('hidden');
+        el('mediaTitle').textContent = data.title || 'Título não disponível';
+        el('mediaDuration').textContent = data.duration ? `Duração: ${data.duration}` : 'Duração não disponível';
+        
+        // Preenche a lista de formatos
+        el('formats').innerHTML = data.formats.map(f =>
+          `<option value="${f.id}">
+            ${f.res.padEnd(6)} | ${f.ext} | ${f.vcodec!=='none'? 'Vídeo' : ''}${f.acodec!=='none'? 'Áudio':''}
+          </option>`
+        ).join('');
+        
+        el('formats').classList.remove('hidden');
+        el('download').classList.remove('hidden');
+        el('resultContainer').classList.remove('hidden');
+        showStatus('Selecione o formato e baixe!', 'success');
+        
+      } catch (error) {
+        showStatus('Erro ao conectar ao servidor', 'error');
+      } finally {
+        el('check').disabled = false;
+      }
+    };
+
+    el('download').onclick = async () => {
+      const url = el('url').value.trim();
+      const fmtId = el('formats').value;
+      if(!fmtId) {
+        showStatus('Selecione um formato para baixar', 'error');
+        return;
+      }
+
+      showStatus('Preparando download...');
+      el('download').disabled = true;
+      el('progressContainer').classList.remove('hidden');
+
+      try {
+        const res = await fetch('/download', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({url,format:fmtId})
+        });
+        
+        const data = await res.json();
+        if(data.error) {
+          showStatus(data.error, 'error');
+          return;
+        }
+        
+        showStatus(data.message || 'Download iniciado!', 'success');
+        
+        // Simulação de progresso (substitua por progresso real se disponível)
+        simulateProgress();
+        
+      } catch (error) {
+        showStatus('Erro durante o download', 'error');
+      } finally {
+        el('download').disabled = false;
+      }
+    };
+
+    function showStatus(message, type = '') {
+      const status = el('status');
+      status.textContent = message;
+      status.className = 'status-message';
+      if (type) status.classList.add(type);
+    }
+
+    function simulateProgress() {
+      let progress = 0;
+      const progressBar = el('progressBar');
+      const progressText = el('progressText');
+      
+      const progressInterval = setInterval(() => {
+        progress += Math.random() * 10;
+        if(progress >= 100) {
+          progress = 100;
+          clearInterval(progressInterval);
+        }
+        progressBar.style.width = `${progress}%`;
+        progressText.textContent = `${Math.round(progress)}%`;
+      }, 300);
+    }
+
+    // Plataformas sugeridas
+    document.querySelectorAll('.platform-icons i').forEach(icon => {
+      icon.addEventListener('click', () => {
+        el('url').value = icon.title + ' ';
+        el('url').focus();
+      });
+    });
+  </script>
+</body>
+</html>
