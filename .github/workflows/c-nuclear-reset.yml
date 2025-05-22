@@ -1,0 +1,39 @@
+name: C - Reset Nuclear
+
+on:
+  workflow_call:
+    inputs:
+      error-log:
+        required: true
+        type: string
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Limpeza Total
+      run: |
+        # Remove tudo relacionado ao Android/Cordova
+        rm -rf ~/.android ~/.cordova ~/.gradle platforms/android
+        
+    - name: Instalação Limpa
+      run: |
+        # Instalação limpa do Ionic como fallback
+        npm install -g @ionic/cli
+        ionic start temp-project --type=angular --cordova
+        cd temp-project
+        ionic cordova platform add android
+        ionic cordova build android
+        
+        # Se funcionar, aplica ao projeto principal
+        cd ..
+        cp -r temp-project/platforms/android ./platforms/
+        
+    - name: Reportar resultado
+      run: |
+        if [ $? -eq 0 ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "status=failed" >> $GITHUB_OUTPUT
+          echo "error-log='Falha no reset nuclear: ${{ inputs.error-log }}'" >> $GITHUB_OUTPUT
+        fi

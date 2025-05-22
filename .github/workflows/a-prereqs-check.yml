@@ -1,0 +1,52 @@
+name: A - Verificação de Pré-requisitos
+
+on:
+  workflow_call:
+    outputs:
+      setup-status:
+        description: "Resultado da verificação"
+        value: ${{ jobs.setup.outputs.status }}
+      error-log:
+        description: "Logs detalhados"
+        value: ${{ jobs.setup.outputs.error-log }}
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.verification.outputs.status }}
+      error-log: ${{ steps.verification.outputs.error-log }}
+    
+    steps:
+    - name: Verificar Ambiente
+      id: verification
+      run: |
+        ERROR_LOG=""
+        
+        # Verifica Node.js
+        if ! command -v node &> /dev/null; then
+          ERROR_LOG="$ERROR_LOG\n❌ Node.js não instalado"
+          npm install -g n
+          n 18
+        fi
+        
+        # Verifica Java
+        if ! command -v java &> /dev/null; then
+          ERROR_LOG="$ERROR_LOG\n❌ Java não instalado"
+          sudo apt-get install -y openjdk-11-jdk
+        fi
+        
+        # Verifica Android SDK
+        if [ -z "$ANDROID_SDK_ROOT" ]; then
+          ERROR_LOG="$ERROR_LOG\n❌ Android SDK não configurado"
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          mkdir -p $HOME/android-sdk
+        fi
+        
+        if [ -z "$ERROR_LOG" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "error-log='Todos os pré-requisitos verificados'" >> $GITHUB_OUTPUT
+        else
+          echo "status=failed" >> $GITHUB_OUTPUT
+          echo "error-log='$ERROR_LOG'" >> $GITHUB_OUTPUT
+        fi

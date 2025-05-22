@@ -1,0 +1,51 @@
+name: B - Instalador Alternativo
+
+on:
+  workflow_call:
+    inputs:
+      error-log:
+        required: true
+        type: string
+
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Analisar erros e tentar alternativas
+      run: |
+        echo "Erros recebidos: ${{ inputs.error-log }}"
+        
+        # Tentativa 1: Usar diferentes versões do Cordova
+        if [[ "${{ inputs.error-log }}" == *"Cordova"* ]]; then
+          npm uninstall -g cordova
+          npm install -g cordova@11.0.0
+        fi
+        
+        # Tentativa 2: Instalar Android SDK alternativo
+        if [[ "${{ inputs.error-log }}" == *"Android"* ]]; then
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip commandlinetools-linux-*.zip -d $ANDROID_SDK_ROOT
+        fi
+        
+        # Tentativa 3: Usar diferentes JDKs
+        if [[ "${{ inputs.error-log }}" == *"Java"* ]]; then
+          sudo apt-get install -y openjdk-17-jdk
+        fi
+        
+        # Tentativa 4: Instalar via Ionic CLI
+        if [[ "${{ inputs.error-log }}" == *"platform"* ]]; then
+          npm install -g @ionic/cli
+          ionic cordova platform add android
+        fi
+        
+        # Tentativa 5: Clean install
+        if [[ "${{ inputs.error-log }}" == *"build"* ]]; then
+          rm -rf node_modules platforms plugins
+          npm install
+          cordova platform add android
+        fi
+        
+        # Se todas falharem, chama o C
+        if [ $? -ne 0 ]; then
+          echo "error-log='${{ inputs.error-log }} + Falha nas alternativas'" >> $GITHUB_OUTPUT
+        fi

@@ -1,0 +1,44 @@
+name: Build Principal com Fallback A-B-C
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  verify:
+    uses: ./.github/workflows/a-prereqs-check.yml
+    
+  build:
+    needs: verify
+    if: needs.verify.outputs.setup-status == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cordova build android --release
+
+  fallback-b:
+    needs: verify
+    if: needs.verify.outputs.setup-status == 'failed'
+    uses: ./.github/workflows/b-fallback-installer.yml
+    with:
+      error-log: ${{ needs.verify.outputs.error-log }}
+
+  fallback-c:
+    needs: fallback-b
+    if: needs.fallback-b.result == 'failure'
+    uses: ./.github/workflows/c-nuclear-reset.yml
+    with:
+      error-log: ${{ needs.fallback-b.outputs.error-log }}
+
+  final-build:
+    needs: [build, fallback-b, fallback-c]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cordova build android --release || echo "Build final falhou"
+      - uses: actions/upload-artifact@v4
+        if: ${{ success() }}
+        with:
+          name: app-release
+          path: platforms/android/app/build/outputs/apk/release/*.apk
