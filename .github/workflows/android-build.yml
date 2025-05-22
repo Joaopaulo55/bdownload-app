@@ -2,8 +2,16 @@ name: Build Cordova Android APK
 
 on:
   push:
-    branches:
-      - master
+    branches: [ main, master ]  # Monitora ambos os branches
+  workflow_dispatch:  # Permite acionamento manual
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
 jobs:
   build:
@@ -11,26 +19,34 @@ jobs:
 
     steps:
       - name: Checkout código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Instalar Java
+      - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: 11
 
-      - name: Instalar Android SDK e Cordova
-        run: |
-          sudo apt update
-          sudo apt install -y nodejs npm zip openjdk-11-jdk
-          npm install -g cordova
-          cordova platform add android
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
 
-      - name: Construir APK
-        run: |
-          cordova build android --release
+      - name: Install Node.js and dependencies
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      
+      - name: Install Cordova
+        run: npm install -g cordova
 
-      - name: Publicar APK como artefato
+      - name: Add Android platform
+        run: cordova platform add android
+
+      - name: Build APK
+        run: |
+          cordova requirements android
+          cordova build android --release --prod
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v3
         with:
           name: Bdownload-APK
